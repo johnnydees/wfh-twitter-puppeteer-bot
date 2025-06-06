@@ -12,7 +12,7 @@ puppeteer.use(Stealth());
 const PROFILE_DIR = '/railway/worker-data';
 const SHEET_RANGE = 'Sheet1!A2:F';
 
-// ── Google Sheets auth
+// Google Sheets auth
 const creds = JSON.parse(process.env.GSHEET_KEY);
 const jwt = new JWT({
   email: creds.client_email,
@@ -39,7 +39,7 @@ async function markPosted(idx) {
   });
 }
 
-// remove stale Chromium lock files
+// Remove stale lock files
 function clearProfileLocks() {
   for (const f of ['SingletonLock', 'SingletonSocket']) {
     const p = path.join(PROFILE_DIR, f);
@@ -55,7 +55,8 @@ async function main() {
   const browser = await puppeteer.launch({
     headless: true,
     userDataDir: PROFILE_DIR,
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
+    executablePath:
+      process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
@@ -66,22 +67,38 @@ async function main() {
 
   const page = await browser.newPage();
 
-  // first-run cookie injection
+  // One-time cookie injection
   if (process.env.AUTH_COOKIE) {
     const hasAuth = (await page.cookies()).some(c => c.name === 'auth_token');
     if (!hasAuth) {
       const base = [{
-        name: 'auth_token', value: process.env.AUTH_COOKIE,
-        domain: '.twitter.com', path: '/', httpOnly: true, secure: true,
+        name: 'auth_token',
+        value: process.env.AUTH_COOKIE,
+        domain: '.twitter.com',
+        path: '/',
+        httpOnly: true,
+        secure: true,
       }];
-      if (process.env.CT0?.trim()) base.push({
-        name: 'ct0', value: process.env.CT0.trim(),
-        domain: '.twitter.com', path: '/', httpOnly: true, secure: true,
-      });
-      if (process.env.TWID?.trim()) base.push({
-        name: 'twid', value: process.env.TWID.trim(),
-        domain: '.twitter.com', path: '/', httpOnly: true, secure: true,
-      });
+      if (process.env.CT0?.trim()) {
+        base.push({
+          name: 'ct0',
+          value: process.env.CT0.trim(),
+          domain: '.twitter.com',
+          path: '/',
+          httpOnly: true,
+          secure: true,
+        });
+      }
+      if (process.env.TWID?.trim()) {
+        base.push({
+          name: 'twid',
+          value: process.env.TWID.trim(),
+          domain: '.twitter.com',
+          path: '/',
+          httpOnly: true,
+          secure: true,
+        });
+      }
       await page.setCookie(...base);
     }
   }
@@ -91,12 +108,30 @@ async function main() {
 
   for (let i = 0; i < rows.length && posted < 5; i++) {
     if (rows[i][5]?.startsWith('YES')) continue;
+
     try {
+      // 1. Go to Home
       await page.goto('https://twitter.com/home', { waitUntil: 'networkidle2' });
 
+      // Debug: log URL and title
+      await page.waitForTimeout(3000);
+      console.log('DEBUG current URL:', page.url());
+      console.log('DEBUG page title:', await page.title());
+
+      // Debug: screenshot to logs
+      try {
+        const buf = await page.screenshot({ type: 'png', fullPage: true });
+        console.log('SCREENSHOT_BASE64_START');
+        console.log(buf.toString('base64'));
+        console.log('SCREENSHOT_BASE64_END');
+      } catch (e) {
+        console.warn('Screenshot failed', e);
+      }
+
+      // 2. Attempt to click "New Tweet"
       await page.waitForSelector(
         'a[aria-label="Post"], div[data-testid="SideNav_NewTweet_Button"], div[data-testid="AppTabBar_NewTweet_Button"]',
-        { timeout: 40000 }
+        { timeout: 20000 }
       );
       const postBtn =
         (await page.$('a[aria-label="Post"]')) ||
@@ -104,15 +139,17 @@ async function main() {
         (await page.$('div[data-testid="AppTabBar_NewTweet_Button"]'));
       await postBtn.click();
 
+      // 3. Wait for textarea
       await page.waitForSelector(
         'div[role="textbox"], div[data-testid="tweetTextarea_0"], textarea',
-        { timeout: 60000 }
+        { timeout: 20000 }
       );
       const box =
         (await page.$('div[role="textbox"]')) ||
         (await page.$('div[data-testid="tweetTextarea_0"]')) ||
         (await page.$('textarea'));
 
+      // 4. Type & send
       await box.type(rows[i][4]);
       await page.click('div[data-testid="tweetButtonInline"]');
       await page.waitForTimeout(3000);
@@ -120,12 +157,12 @@ async function main() {
       await markPosted(i);
       posted++;
     } catch (err) {
-      console.error('Tweet failed row', i + 2, err);
+      console.error(`Tweet failed row ${i + 2}`, err);
     }
   }
 
   await browser.close();
-  await new Promise(r => setTimeout(r, 2000)); // ensure locks released
+  await new Promise(r => setTimeout(r, 2000));
   console.log('Done, posted', posted);
 }
 
