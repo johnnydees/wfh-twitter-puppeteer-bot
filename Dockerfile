@@ -1,6 +1,6 @@
 FROM node:20-slim
 
-# --- OS packages: chromium & build tools ---
+# --- OS packages ---
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         chromium chromium-driver \
@@ -12,7 +12,7 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 
 WORKDIR /app
 COPY package.json .
-RUN npm install --production
+RUN npm install --omit=dev          # <— updated flag
 COPY . .
 
 CMD ["node", "index.js"]
