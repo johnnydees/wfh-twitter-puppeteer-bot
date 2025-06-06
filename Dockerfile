@@ -17,7 +17,7 @@ WORKDIR /app
 
 # ---- install Node deps ----
 COPY package.json .
-RUN npm ci --omit=dev          # smaller image, no devDependencies
+RUN npm install --production
 
 COPY . .
 
