@@ -1,0 +1,10 @@
+{
+  "name": "wfh-twitter-puppeteer-bot",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "puppeteer-core": "^21.3.8",
+    "googleapis": "^130.0.0",
+    "google-auth-library": "^9.0.0"
+  }
+}
