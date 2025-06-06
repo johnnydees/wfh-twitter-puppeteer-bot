@@ -38,14 +38,22 @@ const browser = await puppeteer.launch({
   args: ['--no-sandbox', '--disable-setuid-sandbox']
 });
   const page = await browser.newPage();
-  await page.setCookie({
-    name: 'auth_token',
-    value: process.env.AUTH_COOKIE,
-    domain: '.twitter.com',
-    path: '/',
-    httpOnly: true,
-    secure: true,
-  });
+await page.setCookie({
+  name: 'auth_token',
+  value: process.env.AUTH_COOKIE,
+  domain: '.twitter.com',
+  path: '/',
+  httpOnly: true,
+  secure: true
+});
+await page.setCookie({
+  name: 'ct0',
+  value: process.env.CT0,
+  domain: '.twitter.com',
+  path: '/',
+  httpOnly: true,
+  secure: true
+});
   await page.goto('https://twitter.com/compose/tweet', { waitUntil: 'networkidle2' });
   await page.waitForSelector('div[role="textbox"]', { timeout: 15000 });
   await page.type('div[role="textbox"]', text);
