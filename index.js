@@ -95,10 +95,10 @@ async function tweet(text) {
   }
 
   /* ---- Wait for textarea ---- */
-  await page.waitForSelector(
-    'div[role="textbox"], div[data-testid="tweetTextarea_0"]',
-    { timeout: 20000 }
-  );
+await page.waitForSelector(
+  'div[role="textbox"], div[data-testid="tweetTextarea_0"]',
+  { timeout: 60000 }   // give compose dialog up to 60 s to appear
+);
   const box =
     (await page.$('div[role="textbox"]')) ||
     (await page.$('div[data-testid="tweetTextarea_0"]'));
