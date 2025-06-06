@@ -31,10 +31,12 @@ async function markPosted(rowIndex) {
 
 // ------- Puppeteer (headless Chrome) -------
 async function tweet(text) {
-  const browser = await puppeteer.launch({
-    headless: process.env.HEADLESS !== 'false',
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
-  });
+const browser = await puppeteer.launch({
+  headless: process.env.HEADLESS !== 'false',
+  // point puppeteer to the system Chromium we installed in the Dockerfile
+  executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
+  args: ['--no-sandbox', '--disable-setuid-sandbox']
+});
   const page = await browser.newPage();
   await page.setCookie({
     name: 'auth_token',
