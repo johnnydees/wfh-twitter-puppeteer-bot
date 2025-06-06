@@ -3,7 +3,7 @@ import puppeteer from 'puppeteer-core';
 import { google } from 'googleapis';
 import { JWT } from 'google-auth-library';
 
-/* ───────── Google Sheets setup ───────── */
+/* ───────── Google Sheets auth ───────── */
 const creds = JSON.parse(process.env.GSHEET_KEY);
 const jwt = new JWT({
   email: creds.client_email,
@@ -19,7 +19,6 @@ async function getRows() {
   });
   return res.data.values ?? [];
 }
-
 async function markPosted(rowIdx) {
   await sheets.spreadsheets.values.update({
     spreadsheetId: process.env.SHEET_ID,
@@ -45,7 +44,7 @@ async function tweet(text) {
 
   const page = await browser.newPage();
 
-  /* ---- Inject cookies safely ---- */
+  /* ---- Inject cookies ---- */
   const cookies = [
     {
       name: 'auth_token',
@@ -56,7 +55,6 @@ async function tweet(text) {
       secure: true,
     },
   ];
-
   if (process.env.CT0 && process.env.CT0.trim()) {
     cookies.push({
       name: 'ct0',
@@ -79,10 +77,34 @@ async function tweet(text) {
   }
   await page.setCookie(...cookies);
 
-  /* ---- Go to composer (direct) ---- */
-  await page.goto('https://twitter.com/compose/tweet', {
-    waitUntil: 'networkidle2',
-  });
+  /* ---- 1. Go to Home ---- */
+  await page.goto('https://twitter.com/home', { waitUntil: 'networkidle2' });
+
+  /* ---- 2. Click the "Post/New Tweet" button ---- */
+  await page.waitForSelector(
+    'a[aria-label="Post"], div[data-testid="SideNav_NewTweet_Button"], div[data-testid="AppTabBar_NewTweet_Button"]',
+    { timeout: 30000 }
+  );
+  const postBtn =
+    (await page.$('a[aria-label="Post"]')) ||
+    (await page.$('div[data-testid="SideNav_NewTweet_Button"]')) ||
+    (await page.$('div[data-testid="AppTabBar_NewTweet_Button"]'));
+  await postBtn.click();
+
+  /* ---- 3. Wait for the textarea ---- */
+  await page.waitForSelector(
+    'div[role="textbox"], div[data-testid="tweetTextarea_0"], textarea',
+    { timeout: 60000 }
+  );
+  const box =
+    (await page.$('div[role="textbox"]')) ||
+    (await page.$('div[data-testid="tweetTextarea_0"]')) ||
+    (await page.$('textarea'));
+
+  /* ---- 4. Type + send ---- */
+  await box.type(text);
+  await page.click('div[data-testid="tweetButtonInline"]');
+  await page.waitForTimeout(4000);
 
   /* ---- DEBUG screenshot to logs ---- */
   try {
@@ -94,17 +116,6 @@ async function tweet(text) {
     console.warn('Screenshot failed', e);
   }
 
-  /* ---- Wait for textarea ---- */
-await page.waitForSelector(
-  'div[role="textbox"], div[data-testid="tweetTextarea_0"]',
-  { timeout: 60000 }   // give compose dialog up to 60 s to appear
-);
-  const box =
-    (await page.$('div[role="textbox"]')) ||
-    (await page.$('div[data-testid="tweetTextarea_0"]'));
-  await box.type(text);
-  await page.click('div[data-testid="tweetButtonInline"]');
-  await page.waitForTimeout(4000);
   await browser.close();
 }
 
@@ -115,7 +126,7 @@ await page.waitForSelector(
 
   for (let i = 0; i < rows.length && posted < 5; i++) {
     const row = rows[i];
-    if (row[5] && row[5].startsWith('YES')) continue;
+    if (row[5] && row[5].startsWith('YES')) continue; // already tweeted
     const tweetText = row[4];
     try {
       await tweet(tweetText);
