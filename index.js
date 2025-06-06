@@ -108,56 +108,28 @@ async function main() {
 
   for (let i = 0; i < rows.length && posted < 5; i++) {
     if (rows[i][5]?.startsWith('YES')) continue;
-
     try {
-      // 1. Go to Home
-      await page.goto('https://twitter.com/home', { waitUntil: 'networkidle2' });
+      // 1. Go to mobile home
+      await page.goto('https://mobile.twitter.com/home', { waitUntil: 'networkidle2' });
 
-      // Debug: log URL and title
-      await page.waitForTimeout(3000);
-      console.log('DEBUG current URL:', page.url());
-      console.log('DEBUG page title:', await page.title());
+      // 2. Click the “Tweet” (+) button on mobile
+      await page.waitForSelector('a[aria-label="Tweet"]', { timeout: 20000 });
+      const tweetBtn = await page.$('a[aria-label="Tweet"]');
+      await tweetBtn.click();
 
-      // Debug: screenshot to logs
-      try {
-        const buf = await page.screenshot({ type: 'png', fullPage: true });
-        console.log('SCREENSHOT_BASE64_START');
-        console.log(buf.toString('base64'));
-        console.log('SCREENSHOT_BASE64_END');
-      } catch (e) {
-        console.warn('Screenshot failed', e);
-      }
+      // 3. Wait for mobile textarea
+      await page.waitForSelector('div[role="textbox"]', { timeout: 20000 });
+      const box = await page.$('div[role="textbox"]');
 
-      // 2. Attempt to click "New Tweet"
-      await page.waitForSelector(
-        'a[aria-label="Post"], div[data-testid="SideNav_NewTweet_Button"], div[data-testid="AppTabBar_NewTweet_Button"]',
-        { timeout: 20000 }
-      );
-      const postBtn =
-        (await page.$('a[aria-label="Post"]')) ||
-        (await page.$('div[data-testid="SideNav_NewTweet_Button"]')) ||
-        (await page.$('div[data-testid="AppTabBar_NewTweet_Button"]'));
-      await postBtn.click();
-
-      // 3. Wait for textarea
-      await page.waitForSelector(
-        'div[role="textbox"], div[data-testid="tweetTextarea_0"], textarea',
-        { timeout: 20000 }
-      );
-      const box =
-        (await page.$('div[role="textbox"]')) ||
-        (await page.$('div[data-testid="tweetTextarea_0"]')) ||
-        (await page.$('textarea'));
-
-      // 4. Type & send
+      // 4. Type & post
       await box.type(rows[i][4]);
-      await page.click('div[data-testid="tweetButtonInline"]');
+      await page.click('div[data-testid="tweetButton"]');
       await page.waitForTimeout(3000);
 
       await markPosted(i);
       posted++;
     } catch (err) {
-      console.error(`Tweet failed row ${i + 2}`, err);
+      console.error('Tweet failed row', i + 2, err);
     }
   }
 
@@ -165,6 +137,11 @@ async function main() {
   await new Promise(r => setTimeout(r, 2000));
   console.log('Done, posted', posted);
 }
+
+main().catch(err => {
+  console.error('Fatal', err);
+  process.exit(1);
+});
 
 main().catch(err => {
   console.error('Fatal', err);
