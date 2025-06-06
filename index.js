@@ -15,7 +15,7 @@ const sheets = google.sheets({ version: 'v4', auth: jwt });
 async function getRows() {
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.SHEET_ID,
-    range: 'Sheet1!A2:F', // Title | Price | Link | AffLink | Tweet | Posted
+    range: 'Sheet1!A2:F',
   });
   return res.data.values ?? [];
 }
@@ -44,7 +44,7 @@ async function tweet(text) {
 
   const page = await browser.newPage();
 
-  /* ---- Inject cookies ---- */
+  /* ---- Insert cookies ---- */
   const cookies = [
     {
       name: 'auth_token',
@@ -55,7 +55,7 @@ async function tweet(text) {
       secure: true,
     },
   ];
-  if (process.env.CT0 && process.env.CT0.trim()) {
+  if (process.env.CT0?.trim()) {
     cookies.push({
       name: 'ct0',
       value: process.env.CT0.trim(),
@@ -65,7 +65,7 @@ async function tweet(text) {
       secure: true,
     });
   }
-  if (process.env.TWID && process.env.TWID.trim()) {
+  if (process.env.TWID?.trim()) {
     cookies.push({
       name: 'twid',
       value: process.env.TWID.trim(),
@@ -77,10 +77,15 @@ async function tweet(text) {
   }
   await page.setCookie(...cookies);
 
-  /* ---- 1. Go to Home ---- */
+  /* ---- Step 1: go to Home ---- */
   await page.goto('https://twitter.com/home', { waitUntil: 'networkidle2' });
 
-  /* ---- 2. Click the "Post/New Tweet" button ---- */
+  /* ---- DEBUG: where are we? ---- */
+  await page.waitForTimeout(5000); // let redirects finish
+  console.log('DEBUG current URL:', page.url());
+  console.log('DEBUG page title:', await page.title());
+
+  /* ---- Step 2: click Post/New Tweet button ---- */
   await page.waitForSelector(
     'a[aria-label="Post"], div[data-testid="SideNav_NewTweet_Button"], div[data-testid="AppTabBar_NewTweet_Button"]',
     { timeout: 30000 }
@@ -91,7 +96,7 @@ async function tweet(text) {
     (await page.$('div[data-testid="AppTabBar_NewTweet_Button"]'));
   await postBtn.click();
 
-  /* ---- 3. Wait for the textarea ---- */
+  /* ---- Step 3: wait for textarea ---- */
   await page.waitForSelector(
     'div[role="textbox"], div[data-testid="tweetTextarea_0"], textarea',
     { timeout: 60000 }
@@ -101,12 +106,12 @@ async function tweet(text) {
     (await page.$('div[data-testid="tweetTextarea_0"]')) ||
     (await page.$('textarea'));
 
-  /* ---- 4. Type + send ---- */
+  /* ---- Step 4: type & send ---- */
   await box.type(text);
   await page.click('div[data-testid="tweetButtonInline"]');
   await page.waitForTimeout(4000);
 
-  /* ---- DEBUG screenshot to logs ---- */
+  /* ---- Screenshot to logs ---- */
   try {
     const buf = await page.screenshot({ type: 'png', fullPage: true });
     console.log('SCREENSHOT_BASE64_START');
@@ -126,7 +131,7 @@ async function tweet(text) {
 
   for (let i = 0; i < rows.length && posted < 5; i++) {
     const row = rows[i];
-    if (row[5] && row[5].startsWith('YES')) continue; // already tweeted
+    if (row[5]?.startsWith('YES')) continue;
     const tweetText = row[4];
     try {
       await tweet(tweetText);
